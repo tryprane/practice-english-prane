@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const callTimerStatus = document.getElementById('call-timer-status');
   
   const ongoingCallControls = document.getElementById('ongoing-call-controls');
+  const minimizeBtn = document.getElementById('minimize-call-btn');
   const muteBtn = document.getElementById('mute-btn');
   const speakerBtn = document.getElementById('speaker-btn');
   const hangupBtn = document.getElementById('hangup-btn');
@@ -54,7 +55,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function setupCallUI(state) {
     callModal.classList.add('active');
-    callModal.className = 'call-overlay active';
+    callModal.classList.remove('minimized');
+    
+    // In case there was a dialing row, let's clean it up
+    const existingRow = document.getElementById('dialing-hangup-row');
+    if (existingRow) existingRow.remove();
+    
     callAvatar.innerText = utils.getInitials(peerName);
     callUserName.innerText = peerName;
 
@@ -243,6 +249,17 @@ document.addEventListener('DOMContentLoaded', () => {
           remoteAudio.setSinkId(deviceId);
         }
       });
+    }
+  });
+
+  minimizeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    callModal.classList.add('minimized');
+  });
+
+  callModal.addEventListener('click', (e) => {
+    if (callModal.classList.contains('minimized')) {
+      callModal.classList.remove('minimized');
     }
   });
 
