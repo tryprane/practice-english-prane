@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Practice English Prane Admin Portal - Manage rooms">
+  <title>Practice English Prane Admin</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="screen-container">
+    
+    <div id="login-screen" class="layout-auth">
+      <h1 class="title-main">Admin Portal</h1>
+      <p class="subtitle-main">Sign in to manage active communication channels</p>
+      
+      <form id="login-form" class="card">
+        <div class="input-group">
+          <label class="input-label" for="admin-password">Password</label>
+          <input class="input-field" type="password" id="admin-password" placeholder="••••••••" required>
+        </div>
+        <button class="btn-primary" type="submit" style="margin-top: 8px;">Log In</button>
+      </form>
+      
+      <div class="flex-center" style="margin-top: 32px;">
+        <a href="index.html" class="link-btn">Go to Main Portal</a>
+      </div>
+    </div>
+    
+    <div id="dashboard-screen" style="display: none; height: 100%;" class="flex-center">
+      <div style="width: 100%; height: 100%; display: flex; flex-direction: column;">
+        <div class="admin-header">
+          <span class="admin-title">Practice English Prane Rooms</span>
+          <button id="logout-btn" class="btn-logout">Logout</button>
+        </div>
+        
+        <main class="admin-content">
+          <section class="room-creation-section">
+            <h2 class="input-label">Create Channel</h2>
+            <form id="create-room-form" class="card" style="display: flex; flex-direction: column; gap: 12px; padding: 16px;">
+              <div style="display: flex; gap: 12px;">
+                <input class="input-field" type="text" id="new-room-name" placeholder="Room Name" required style="margin: 0; flex: 1;">
+                <input class="input-field" type="text" id="new-room-code" placeholder="Custom Code" style="margin: 0; width: 120px; text-transform: uppercase;" maxlength="10">
+              </div>
+              <button class="btn-primary" type="submit">Create Room</button>
+            </form>
+          </section>
+          
+          <section class="rooms-list-container" style="flex: 1; display: flex; flex-direction: column;">
+            <h2 class="rooms-list-header">Active Rooms</h2>
+            <div id="rooms-list" style="margin-top: 10px; flex: 1; overflow-y: auto;">
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+    
+  </div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>

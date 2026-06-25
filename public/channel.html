@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Practice English Prane - Private secure chat and voice call room">
+  <title>Practice English Prane - Channel</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <div class="screen-container">
+    
+    <header class="channel-header">
+      <div class="channel-identity">
+        <button id="back-btn" class="btn-logout" style="padding: 6px 10px; margin-right: 4px;">Leave</button>
+        <div id="room-avatar" class="channel-avatar">??</div>
+        <div class="channel-details">
+          <span id="room-name" class="channel-room-name">Loading...</span>
+          <div class="channel-status-container">
+            <span id="status-dot" class="status-dot"></span>
+            <span id="status-text" class="channel-status-text">Connecting...</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="channel-header-actions">
+        <button id="call-logs-btn" class="btn-header-action">📋</button>
+        <button id="voice-call-btn" class="btn-header-action call" style="display: none;">📞</button>
+      </div>
+    </header>
+    
+    <main id="chat-area" class="chat-messages-area">
+    </main>
+
+    <div id="typing-indicator" class="typing-indicator-chat"></div>
+    
+    <div id="image-preview" class="image-preview-bar">
+      <div class="preview-thumb-container">
+        <img id="preview-img" class="preview-thumb" src="" alt="Preview">
+        <div class="preview-details">
+          <span id="preview-filename" class="preview-name">image.jpg</span>
+          <span id="preview-filesize" class="preview-size">0 KB</span>
+        </div>
+      </div>
+      <button id="remove-preview-btn" class="btn-remove-preview">Remove</button>
+    </div>
+
+    <form id="chat-input-form" class="chat-input-area">
+      <button id="attach-btn" class="btn-chat-action" type="button">📎</button>
+      <input type="file" id="image-file-input" accept="image/*" style="display: none;">
+      
+      <input type="text" id="message-input" class="chat-input-field" placeholder="Type a message..." autocomplete="off">
+      
+      <button id="send-btn" class="btn-chat-action send" type="submit">➤</button>
+    </form>
+    
+    <div id="call-modal" class="call-overlay">
+      <div class="call-identity">
+        <div class="call-avatar-wrapper">
+          <div id="call-avatar" class="call-avatar">??</div>
+          <div class="call-avatar-pulse"></div>
+        </div>
+        <span id="call-user-name" class="call-name">Peer User</span>
+        <span id="call-timer-status" class="call-status">Dialing...</span>
+      </div>
+      
+      <div class="call-actions-area">
+        <div id="ongoing-call-controls" class="call-controls-row" style="display: none;">
+          <button id="mute-btn" class="call-btn">🔇</button>
+          <button id="speaker-btn" class="call-btn">🔊</button>
+          <button id="hangup-btn" class="call-btn hangup">📞</button>
+        </div>
+        
+        <div id="incoming-call-controls" class="call-incoming-row" style="display: none;">
+          <button id="decline-btn" class="call-btn decline">📞</button>
+          <button id="accept-btn" class="call-btn accept">📞</button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="logs-modal" class="modal-overlay">
+      <div class="modal-content-card card">
+        <div class="modal-header">
+          <span class="modal-title">Call History (24h)</span>
+          <button id="close-logs-btn" class="modal-close-btn">✕</button>
+        </div>
+        <div id="call-logs-list" class="call-logs-list">
+          <div class="no-rooms">No call history</div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="image-viewer" class="image-viewer-overlay">
+      <div class="image-viewer-header">
+        <button id="close-viewer-btn" class="btn-logout" style="border-radius: 50%; width: 40px; height: 40px; padding: 0;">✕</button>
+      </div>
+      <div class="image-viewer-content">
+        <img id="viewer-img" class="viewer-img" src="" alt="Full view">
+      </div>
+      <div style="height: 60px;"></div>
+    </div>
+
+    <audio id="remote-audio" autoplay style="display: none;"></audio>
+    
+  </div>
+
+  <script src="js/utils.js"></script>
+  <script src="js/call.js"></script>
+  <script src="js/channel.js"></script>
+</body>
+</html>
