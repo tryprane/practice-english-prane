@@ -946,3 +946,62 @@ button:active {
   background: none;
   border: none;
 }
+
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+.recent-rooms-container {
+  margin-top: 32px;
+  width: 100%;
+}
+
+.recent-title {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.recent-rooms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.recent-room-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.recent-room-item:hover {
+  border-color: var(--color-accent);
+  background: var(--bg-input);
+  transform: translateY(-1px);
+}
+
+.recent-room-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.recent-room-code {
+  font-size: 12px;
+  color: var(--color-accent);
+  background: rgba(99, 102, 241, 0.1);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-family: monospace;
+}
+
+/* -------------------------------------
+   CHANNEL STYLES */
