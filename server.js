@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { execSync } = require('child_process');
 const cron = require('node-cron');
 const { v4: uuidv4 } = require('uuid');
 
@@ -15,6 +16,34 @@ const io = new Server(server, {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+let ASSET_VERSION = '1';
+try {
+  ASSET_VERSION = execSync('git rev-parse --short HEAD', { cwd: __dirname }).toString().trim() || '1';
+} catch (e) {}
+if (ASSET_VERSION === '1') {
+  try {
+    ASSET_VERSION = Math.floor(fs.statSync(path.join(__dirname, 'public', 'css', 'styles.css')).mtimeMs / 1000).toString();
+  } catch (e2) {}
+}
+
+const htmlPageNames = new Set(['index.html', 'channel.html', 'admin.html']);
+
+app.use((req, res, next) => {
+  const reqBase = path.basename(req.path === '/' ? '/index.html' : req.path);
+  if (!htmlPageNames.has(reqBase)) return next();
+  const file = path.join(__dirname, 'public', reqBase);
+  try {
+    if (fs.existsSync(file)) {
+      const html = fs.readFileSync(file, 'utf8')
+        .replace(/((?:href|src)=")(css\/[^"?#]+|js\/[^"?#]+)(")/g, (m, pre, p, post) => `${pre}${p}?v=${ASSET_VERSION}${post}`);
+      res.set('Cache-Control', 'no-cache');
+      return res.type('text/html').send(html);
+    }
+  } catch (e) {}
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

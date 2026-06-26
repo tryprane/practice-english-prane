@@ -8,6 +8,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const recentSection = document.getElementById('recent-rooms-section');
   const recentList = document.getElementById('recent-rooms-list');
 
+  // Restore the last-used name so the user doesn't have to retype it
+  const savedName = localStorage.getItem('prane_saved_name');
+  if (savedName) {
+    nameInput.value = savedName;
+  }
+
   // Load recent rooms from localStorage
   function loadRecentRooms() {
     const saved = localStorage.getItem('prane_recent_rooms');
@@ -28,8 +34,11 @@ document.addEventListener('DOMContentLoaded', () => {
           `;
           item.onclick = () => {
             codeInput.value = room.code;
-            if (!nameInput.value) nameInput.focus();
-            else form.dispatchEvent(new Event('submit'));
+            if (!nameInput.value) {
+              nameInput.focus();
+            } else {
+              form.dispatchEvent(new Event('submit'));
+            }
           };
           recentList.appendChild(item);
         });
@@ -43,7 +52,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (codeParam) {
     codeInput.value = codeParam.toUpperCase();
-    nameInput.focus();
+    if (!nameInput.value) nameInput.focus();
+    else codeInput.focus();
+  } else if (savedName) {
+    codeInput.focus();
   }
 
   form.addEventListener('submit', async (e) => {
@@ -67,6 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (data.success) {
         sessionStorage.setItem('prane_username', name);
+        localStorage.setItem('prane_saved_name', name);
 
         // Save to recent rooms
         const saved = localStorage.getItem('prane_recent_rooms');

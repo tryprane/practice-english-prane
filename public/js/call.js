@@ -27,6 +27,12 @@ document.addEventListener('DOMContentLoaded', () => {
   let isSpeakerOn = false;
   let isCaller = false;
 
+  let wakeLock = null;
+  let proximitySensor = null;
+  let proximityListener = null;
+  let proximityActive = false;
+  let enumeratedDevices = null;
+
   const iceServers = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
@@ -95,6 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
       ongoingCallControls.style.display = 'flex';
       incomingCallControls.style.display = 'none';
       removeDialingHangupRow();
+      acquireWakeLock();
+      if (!isSpeakerOn) startProximityMonitoring();
     }
   }
 
@@ -138,6 +146,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // Permission now granted, so device labels are available -> route audio.
+    await refreshAudioDevices();
+    routeAudioOutput();
+
     peerConnection = new RTCPeerConnection(iceServers);
 
     localStream.getTracks().forEach(track => {
@@ -162,6 +174,106 @@ document.addEventListener('DOMContentLoaded', () => {
       getSocket().emit('webrtc-offer', offer);
     }
   }
+
+  // ---- Audio output routing: earpiece vs loudspeaker ----
+  async function refreshAudioDevices() {
+    try {
+      enumeratedDevices = await navigator.mediaDevices.enumerateDevices();
+    } catch (e) {
+      enumeratedDevices = [];
+    }
+    return enumeratedDevices;
+  }
+
+  async function routeAudioOutput() {
+    // setSinkId is the only way to choose the physical output device.
+    // Supported on Chromium-based mobile browsers; gracefully no-ops elsewhere
+    // (the OS default output is then used).
+    if (!remoteAudio || typeof remoteAudio.setSinkId !== 'function') return;
+
+    const devices = enumeratedDevices || await refreshAudioDevices();
+    const outputs = devices.filter(d => d.kind === 'audiooutput');
+
+    let targetId = null;
+    if (isSpeakerOn) {
+      const spk = outputs.find(d => /speaker|loud/i.test(d.label)) ||
+                  outputs.find(d => /default/i.test(d.label));
+      targetId = spk ? spk.deviceId : 'default';
+    } else {
+      const ear = outputs.find(d => /earpiece|communication|headset|ear-|receiver/i.test(d.label));
+      targetId = ear ? ear.deviceId : 'communications';
+    }
+
+    if (targetId && remoteAudio.sinkId !== targetId) {
+      try { await remoteAudio.setSinkId(targetId); } catch (e) {}
+    }
+  }
+
+  // ---- Wake lock: keep the call (and WebRTC) alive while screen is on ----
+  async function acquireWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+      }
+    } catch (e) {}
+  }
+
+  function releaseWakeLock() {
+    if (wakeLock) {
+      try { wakeLock.release(); } catch (e) {}
+      wakeLock = null;
+    }
+  }
+
+  // ---- Proximity sensor: darken the screen when held to the ear ----
+  function startProximityMonitoring() {
+    if (proximityActive) return;
+    proximityActive = true;
+
+    if ('ProximitySensor' in window) {
+      try {
+        proximitySensor = new ProximitySensor({ frequency: 5 });
+        proximitySensor.addEventListener('reading', () => {
+          applyProximity(proximitySensor.near);
+        });
+        proximitySensor.addEventListener('error', () => {});
+        proximitySensor.start();
+        return;
+      } catch (e) {}
+    }
+
+    if ('onuserproximity' in window) {
+      proximityListener = (e) => applyProximity(e.near);
+      window.addEventListener('userproximity', proximityListener);
+    } else if ('ondeviceproximity' in window) {
+      proximityListener = (e) => applyProximity(e.value < (e.max / 2));
+      window.addEventListener('deviceproximity', proximityListener);
+    }
+  }
+
+  function stopProximityMonitoring() {
+    if (proximitySensor) {
+      try { proximitySensor.stop(); } catch (e) {}
+      proximitySensor = null;
+    }
+    if (proximityListener) {
+      window.removeEventListener('userproximity', proximityListener);
+      window.removeEventListener('deviceproximity', proximityListener);
+      proximityListener = null;
+    }
+    proximityActive = false;
+    applyProximity(false);
+  }
+
+  function applyProximity(near) {
+    document.body.classList.toggle('proximity-dark', !!near);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && callModal.classList.contains('active')) {
+      acquireWakeLock();
+    }
+  });
 
   acceptBtn.addEventListener('click', () => {
     utils.stopRingSound();
@@ -202,6 +314,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function cleanupCall() {
     utils.stopRingSound();
     stopCallTimer();
+    stopProximityMonitoring();
+    releaseWakeLock();
     
     if (peerConnection) {
       peerConnection.close();
@@ -237,18 +351,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  speakerBtn.addEventListener('click', () => {
+  speakerBtn.addEventListener('click', async () => {
     isSpeakerOn = !isSpeakerOn;
     speakerBtn.classList.toggle('active', isSpeakerOn);
-    
-    if (remoteAudio.sinkId && typeof remoteAudio.setSinkId === 'function') {
-      navigator.mediaDevices.enumerateDevices().then(devices => {
-        const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
-        if (audioOutputs.length > 1) {
-          const deviceId = isSpeakerOn ? audioOutputs[1].deviceId : audioOutputs[0].deviceId;
-          remoteAudio.setSinkId(deviceId);
-        }
-      });
+
+    await routeAudioOutput();
+
+    if (isSpeakerOn) {
+      // Loudspeaker: stop watching proximity, keep screen visible.
+      stopProximityMonitoring();
+    } else {
+      // Earpiece: route to earpiece and watch proximity again.
+      startProximityMonitoring();
     }
   });
 
