@@ -44,6 +44,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   socket.emit('join-room', { code, name });
 
+  setupPushNotifications(code, name);
+
   socket.on('joined', (data) => {
     roomNameEl.innerText = data.roomName;
     roomAvatar.innerText = utils.getInitials(data.roomName);
@@ -67,6 +69,20 @@ document.addEventListener('DOMContentLoaded', () => {
       setPeerOnline(false);
     }
   });
+
+  async function setupPushNotifications(roomCode, userName) {
+    if (!utils.pushSupported()) return;
+
+    const permission = await utils.requestNotificationPermission();
+    if (permission !== 'granted') return;
+
+    try {
+      const subscription = await utils.subscribeToPush();
+      if (subscription) {
+        await utils.sendSubscriptionToServer(roomCode, userName, subscription);
+      }
+    } catch (e) {}
+  }
 
   socket.on('peer-joined', (peerUserName) => {
     peerName = peerUserName;

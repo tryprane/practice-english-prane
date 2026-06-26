@@ -216,6 +216,81 @@ const utils = {
         };
       };
     });
+  },
+
+  pushSupported: () => {
+    return ('serviceWorker' in navigator) &&
+           ('PushManager' in window) &&
+           ('Notification' in window);
+  },
+
+  urlBase64ToUint8Array: (base64String) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    const output = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      output[i] = rawData.charCodeAt(i);
+    }
+    return output;
+  },
+
+  requestNotificationPermission: async () => {
+    if (!('Notification' in window)) return 'unsupported';
+    try {
+      const permission = await Notification.requestPermission();
+      return permission;
+    } catch (e) {
+      return 'denied';
+    }
+  },
+
+  subscribeToPush: async () => {
+    if (!utils.pushSupported()) return null;
+    const reg = await navigator.serviceWorker.ready;
+    let subscription = await reg.pushManager.getSubscription();
+    if (subscription) return subscription;
+
+    const res = await fetch('/api/push/vapid-public');
+    const data = await res.json();
+    if (!data || !data.success || !data.publicKey) return null;
+
+    const applicationServerKey = utils.urlBase64ToUint8Array(data.publicKey);
+    subscription = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: applicationServerKey
+    });
+    return subscription;
+  },
+
+  sendSubscriptionToServer: async (code, name, subscription) => {
+    if (!subscription) return false;
+    try {
+      const res = await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, name, subscription })
+      });
+      const data = await res.json();
+      return !!(data && data.success);
+    } catch (e) {
+      return false;
+    }
+  },
+
+  removeSubscriptionFromServer: async (code, subscription) => {
+    if (!subscription) return false;
+    try {
+      const res = await fetch('/api/push/unsubscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, endpoint: subscription.endpoint })
+      });
+      const data = await res.json();
+      return !!(data && data.success);
+    } catch (e) {
+      return false;
+    }
   }
 };
 

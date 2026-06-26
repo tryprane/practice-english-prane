@@ -7,6 +7,7 @@ const fs = require('fs');
 const { execSync } = require('child_process');
 const cron = require('node-cron');
 const { v4: uuidv4 } = require('uuid');
+const webpush = require('web-push');
 
 const app = express();
 const server = http.createServer(app);
@@ -16,6 +17,25 @@ const io = new Server(server, {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// --- VAPID keys for Web Push (generated once, persisted to disk) ---
+const vapidPath = path.join(__dirname, 'data', 'vapid.json');
+let vapidKeys = null;
+try {
+  if (fs.existsSync(vapidPath)) {
+    vapidKeys = JSON.parse(fs.readFileSync(vapidPath, 'utf8'));
+  }
+} catch (e) {
+  vapidKeys = null;
+}
+if (!vapidKeys || !vapidKeys.publicKey || !vapidKeys.privateKey) {
+  vapidKeys = webpush.generateVAPIDKeys();
+  try {
+    fs.writeFileSync(vapidPath, JSON.stringify(vapidKeys, null, 2));
+  } catch (e) {}
+}
+const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:admin@prane.local';
+webpush.setVapidDetails(VAPID_SUBJECT, vapidKeys.publicKey, vapidKeys.privateKey);
 
 let ASSET_VERSION = '1';
 try {
@@ -202,6 +222,96 @@ app.post('/api/upload', upload.single('image'), (req, res) => {
   res.json({ success: true, url: fileUrl });
 });
 
+// --- Web Push subscription endpoints ---
+app.get('/api/push/vapid-public', (req, res) => {
+  res.json({ success: true, publicKey: vapidKeys.publicKey });
+});
+
+app.post('/api/push/subscribe', (req, res) => {
+  const { code, name, subscription } = req.body;
+  if (!code || !name || !subscription || !subscription.endpoint) {
+    return res.status(400).json({ success: false, error: 'Missing subscription data' });
+  }
+  const room = rooms[code.toUpperCase()];
+  if (!room) {
+    return res.status(404).json({ success: false, error: 'Room not found' });
+  }
+  if (!Array.isArray(room.subscriptions)) {
+    room.subscriptions = [];
+  }
+  const record = { name, endpoint: subscription.endpoint, keys: subscription.keys };
+  const existingIdx = room.subscriptions.findIndex(s => s.endpoint === subscription.endpoint);
+  if (existingIdx !== -1) {
+    room.subscriptions[existingIdx] = record;
+  } else {
+    room.subscriptions.push(record);
+  }
+  saveStore();
+  res.json({ success: true });
+});
+
+app.post('/api/push/unsubscribe', (req, res) => {
+  const { code, endpoint } = req.body;
+  const room = rooms[(code || '').toUpperCase()];
+  if (room && Array.isArray(room.subscriptions)) {
+    room.subscriptions = room.subscriptions.filter(s => s.endpoint !== endpoint);
+    saveStore();
+  }
+  res.json({ success: true });
+});
+
+// Send a push notification to room members who are NOT currently connected.
+async function notifyOfflineMembers(roomCode, senderName, message) {
+  const room = rooms[roomCode];
+  if (!room || !Array.isArray(room.subscriptions) || room.subscriptions.length === 0) return;
+
+  const connectedSockets = io.sockets.adapter.rooms.get(roomCode);
+  const connectedSocketIds = connectedSockets ? Array.from(connectedSockets) : [];
+  const connectedNames = room.members
+    .filter(m => connectedSocketIds.includes(m.socketId))
+    .map(m => m.name);
+
+  const bodyText = message.image && !message.text
+    ? '📷 Photo'
+    : (message.text || '📷 Photo');
+
+  const payload = JSON.stringify({
+    title: room.name || 'Prane',
+    body: `${senderName}: ${bodyText}`,
+    roomCode,
+    url: `/channel.html?code=${roomCode}`,
+    tag: `room-${roomCode}`
+  });
+
+  const targets = room.subscriptions.filter(s =>
+    s.name !== senderName &&
+    !connectedNames.includes(s.name) &&
+    s.keys && s.keys.p256dh && s.keys.auth
+  );
+
+  const results = await Promise.allSettled(targets.map(s =>
+    webpush.sendNotification(
+      { endpoint: s.endpoint, keys: s.keys },
+      payload,
+      { TTL: 60 * 60 * 24 }
+    )
+  ));
+
+  let changed = false;
+  results.forEach((res, i) => {
+    if (res.status === 'rejected' && res.reason) {
+      const code = res.reason.statusCode;
+      // 410 Gone / 404 Not Found: subscription is no longer valid, prune it.
+      if (code === 410 || code === 404) {
+        const ep = targets[i].endpoint;
+        room.subscriptions = room.subscriptions.filter(sub => sub.endpoint !== ep);
+        changed = true;
+      }
+    }
+  });
+  if (changed) saveStore();
+}
+
 cron.schedule('0 * * * *', () => {
   const cutoff = Date.now() - 24 * 60 * 60 * 1000;
   let changed = false;
@@ -300,6 +410,7 @@ io.on('connection', (socket) => {
     saveStore();
 
     socket.to(userRoomCode).emit('message-received', message);
+    notifyOfflineMembers(userRoomCode, userName, message).catch(() => {});
     if (callback) {
       callback({ success: true, message });
     }
