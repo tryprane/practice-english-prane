@@ -184,7 +184,11 @@ app.post('/api/rooms/join', (req, res) => {
   if (!room) {
     return res.status(404).json({ success: false, error: 'Room not found' });
   }
-  if (room.members.length >= 2) {
+
+  const connectedSockets = io.sockets.adapter.rooms.get(code.toUpperCase());
+  const activeCount = connectedSockets ? connectedSockets.size : 0;
+
+  if (activeCount >= 2) {
     return res.status(400).json({ success: false, error: 'Room is full' });
   }
   res.json({ success: true, roomName: room.name });
@@ -249,9 +253,17 @@ io.on('connection', (socket) => {
     if (!room) {
       return socket.emit('join-error', 'Room not found');
     }
-    if (room.members.length >= 2) {
+
+    const connectedSockets = io.sockets.adapter.rooms.get(formattedCode);
+    const activeCount = connectedSockets ? connectedSockets.size : 0;
+
+    if (activeCount >= 2) {
       return socket.emit('join-error', 'Room is full');
     }
+
+    room.members = room.members.filter(m => {
+      return io.sockets.sockets.has(m.socketId);
+    });
 
     userRoomCode = formattedCode;
     userName = name;
