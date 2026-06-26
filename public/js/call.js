@@ -329,6 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
     remoteAudio.srcObject = null;
     callModal.classList.remove('active');
     callModal.classList.remove('ongoing');
+    callModal.classList.remove('minimized');
     removeDialingHangupRow();
     
     isMuted = false;
