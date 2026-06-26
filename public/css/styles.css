@@ -31,12 +31,10 @@ body {
   background-color: var(--bg-base);
   color: var(--text-primary);
   height: 100dvh;
-  height: -webkit-fill-available;
   display: flex;
   justify-content: center;
   align-items: center;
   overflow: hidden;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 input, button, textarea {
@@ -109,6 +107,7 @@ button:active {
   flex-direction: column;
   position: relative;
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+  overflow: hidden;
 }
 
 @media (min-width: 450px) {
@@ -362,6 +361,7 @@ button:active {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   z-index: 100;
+  flex-shrink: 0;
 }
 
 .channel-identity {
